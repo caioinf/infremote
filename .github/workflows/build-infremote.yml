@@ -21,6 +21,9 @@ env:
   FRB_VERSION: "1.80.1"
   TAG_NAME: "${{ inputs.tag || github.ref_name }}"
 
+permissions:
+  contents: write
+
 jobs:
   build-windows:
     name: Windows x64
