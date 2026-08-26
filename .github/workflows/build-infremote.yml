@@ -51,9 +51,10 @@ jobs:
       - name: Patch flutter
         shell: bash
         run: |
+          WS_DIR="$(pwd)"
           cd $(dirname $(dirname $(which flutter)))
           if [[ "3.24.5" == ${{ env.FLUTTER_VERSION }} ]]; then
-            git apply "$(pwd)/.github/patches/flutter_3.24.4_dropdown_menu_enableFilter.diff"
+            git apply "$WS_DIR/.github/patches/flutter_3.24.4_dropdown_menu_enableFilter.diff"
           fi
 
       - name: Workaround for flutter issue
@@ -185,9 +186,10 @@ jobs:
 
       - name: Patch flutter
         run: |
+          WS_DIR="$(pwd)"
           cd $(dirname $(dirname $(which flutter)))
           if [[ "3.24.5" == ${{ env.FLUTTER_VERSION }} ]]; then
-            git apply "$(pwd)/.github/patches/flutter_3.24.4_dropdown_menu_enableFilter.diff"
+            git apply "$WS_DIR/.github/patches/flutter_3.24.4_dropdown_menu_enableFilter.diff"
           fi
 
       - name: Workaround for flutter issue
