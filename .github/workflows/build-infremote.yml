@@ -97,6 +97,14 @@ jobs:
             exit 1
           fi
 
+      - name: Generate flutter rust bridge (inline)
+        shell: bash
+        run: |
+          cargo install cargo-expand --version ${{ env.CARGO_EXPAND_VERSION }} --locked
+          cargo install flutter_rust_bridge_codegen --version ${{ env.FRB_VERSION }} --features "uuid" --locked
+          pushd flutter && flutter pub get && popd
+          ~/.cargo/bin/flutter_rust_bridge_codegen --rust-input ./src/flutter_ffi.rs --dart-output ./flutter/lib/generated_bridge.dart --c-output ./flutter/windows/runner/bridge_generated.h
+
       - name: Build InfRemote
         shell: pwsh
         run: |
@@ -214,7 +222,6 @@ jobs:
         run: |
           cargo install cargo-expand --version ${{ env.CARGO_EXPAND_VERSION }} --locked
           cargo install flutter_rust_bridge_codegen --version ${{ env.FRB_VERSION }} --features "uuid" --locked
-          sed -i -e 's/extended_text: 14.0.0/extended_text: 13.0.0/g' flutter/pubspec.yaml
           pushd flutter && flutter pub get && popd
           ~/.cargo/bin/flutter_rust_bridge_codegen --rust-input ./src/flutter_ffi.rs --dart-output ./flutter/lib/generated_bridge.dart --c-output ./flutter/macos/Runner/bridge_generated.h
           cp ./flutter/macos/Runner/bridge_generated.h ./flutter/ios/Runner/bridge_generated.h
