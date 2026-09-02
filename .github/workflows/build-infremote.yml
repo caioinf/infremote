@@ -20,6 +20,12 @@ env:
   CARGO_EXPAND_VERSION: "1.0.95"
   FRB_VERSION: "1.80.1"
   TAG_NAME: "${{ inputs.tag || github.ref_name }}"
+  # Truque para 'skip se secret nao existe' (GitHub nao permite secrets em if).
+  # Quando o secret esta vazio, secrets.X vira string vazia, e o `test -n` falha
+  # mas a variavel HAS_* ainda e' setada (vazia). O step roda mas da echo
+  # e exit 0 sem fazer nada. Abaixo o passo real e' protegido por outro if.
+  HAS_P12: ${{ secrets.MACOS_P12_BASE64 != '' && 'yes' || '' }}
+  HAS_APPLE_ID: ${{ secrets.APPLE_ID != '' && 'yes' || '' }}
 
 permissions:
   contents: write
@@ -259,7 +265,7 @@ jobs:
           ./build.py --flutter --hwcodec --unix-file-copy-paste ${{ matrix.job.extra-build-args }}
 
       - name: codesign InfRemote.app
-        if: ${{ secrets.MACOS_P12_BASE64 != '' }}
+        if: env.HAS_P12 != ''
         env:
           MACOS_P12_BASE64: ${{ secrets.MACOS_P12_BASE64 }}
           MACOS_P12_PASSWORD: ${{ secrets.MACOS_P12_PASSWORD }}
@@ -302,7 +308,7 @@ jobs:
           create-dmg --icon "InfRemote.app" 200 190 --hide-extension "InfRemote.app" --window-size 800 400 --app-drop-link 600 185 InfRemote-${{ env.VERSION }}-${{ matrix.job.arch }}.dmg ./flutter/build/macos/Build/Products/Release/InfRemote.app
 
       - name: notarize (skip se APPLE_ID nao setado)
-        if: ${{ secrets.APPLE_ID != '' }}
+        if: env.HAS_APPLE_ID != ''
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
