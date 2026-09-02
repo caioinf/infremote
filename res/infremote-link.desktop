@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=InfRemote
+NoDisplay=true
+MimeType=x-scheme-handler/infremote;
+TryExec=infremote
+Exec=infremote %u
+Icon=infremote
+Terminal=false
+Type=Application
+StartupNotify=false
+StartupWMClass=infremote
