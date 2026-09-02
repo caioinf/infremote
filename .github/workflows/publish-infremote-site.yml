@@ -1,0 +1,82 @@
+name: Publish InfRemote downloads to Infcamp
+
+on:
+  workflow_run:
+    workflows: ["Build InfRemote (Windows + macOS)"]
+    types: [completed]
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  publish:
+    name: Publish downloads and update site
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-24.04
+    env:
+      VERSION: "1.4.9"
+      HOSTINGER_API_TOKEN: ${{ secrets.HOSTINGER_API_TOKEN }}
+      HOSTINGER_USERNAME: "u334587872"
+      HOSTINGER_DOMAIN: "infcamp.com.br"
+    steps:
+      - name: Check required publishing secret
+        run: test -n "$HOSTINGER_API_TOKEN" || { echo 'HOSTINGER_API_TOKEN não configurado: publicação obrigatória bloqueada.' >&2; exit 1; }
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          pattern: InfRemote-*
+          path: artifacts
+          merge-multiple: true
+
+      - name: Validate all release files
+        run: |
+          set -euo pipefail
+          for f in \
+            "artifacts/InfRemote-${VERSION}-win64.exe" \
+            "artifacts/InfRemote-${VERSION}-aarch64.dmg" \
+            "artifacts/InfRemote-${VERSION}-x86_64.dmg"; do
+            test -s "$f" || { echo "arquivo ausente ou vazio: $f" >&2; exit 1; }
+          done
+
+      - name: Publish files and replace site links atomically
+        run: |
+          set -euo pipefail
+          api='https://api.hostinger.com/api/hosting/v1/files/upload-urls'
+          auth="Authorization: Bearer $HOSTINGER_API_TOKEN"
+
+          tus_upload() {
+            local file="$1" remote="$2" mime="$3" grant base leaf size
+            size=$(stat -c '%s' "$file")
+            grant=$(curl --fail-with-body -sS -X POST "$api" -H "$auth" -H 'Content-Type: application/json' \
+              --data "{\"username\":\"$HOSTINGER_USERNAME\",\"domain\":\"$HOSTINGER_DOMAIN\",\"path\":\"$remote\",\"size\":$size,\"mime_type\":\"$mime\"}")
+            base=$(jq -r '.url' <<<"$grant" | sed 's:/$::')
+            local xauth xrest
+            xauth=$(jq -r '.auth_key' <<<"$grant")
+            xrest=$(jq -r '.rest_auth_key' <<<"$grant")
+            leaf=$(basename "$remote")
+            curl --fail-with-body -sS -X POST "$base/$leaf" \
+              -H "X-Auth: $xauth" -H "X-Auth-Rest: $xrest" -H 'Tus-Resumable: 1.0.0' \
+              -H "Upload-Length: $size" -H "Upload-Metadata: filename $(printf '%s' "$leaf" | base64 -w0)" -o /dev/null || true
+            curl --fail-with-body -sS -X PATCH "$base/rest/$leaf" \
+              -H "X-Auth: $xauth" -H "X-Auth-Rest: $xrest" -H 'Tus-Resumable: 1.0.0' \
+              -H 'Upload-Offset: 0' -H 'Content-Type: application/offset+octet-stream' --data-binary "@$file" -o /dev/null
+          }
+
+          # Public URLs are versioned, so a release can never overwrite an old binary.
+          tus_upload "artifacts/InfRemote-${VERSION}-win64.exe" "downloads/InfRemote-${VERSION}-win64.exe" 'application/x-msdownload'
+          tus_upload "artifacts/InfRemote-${VERSION}-aarch64.dmg" "downloads/InfRemote-${VERSION}-aarch64.dmg" 'application/x-apple-diskimage'
+          tus_upload "artifacts/InfRemote-${VERSION}-x86_64.dmg" "downloads/InfRemote-${VERSION}-x86_64.dmg" 'application/x-apple-diskimage'
+
+          curl --fail-with-body -sS "https://${HOSTINGER_DOMAIN}/acesso-remoto/" -o page.html
+          for suffix in win64.exe aarch64.dmg x86_64.dmg; do
+            sed -E -i "s/InfRemote-[^\"']+-${suffix}/InfRemote-${VERSION}-${suffix}/g" page.html
+          done
+          grep -q "InfRemote-${VERSION}-win64.exe" page.html
+          grep -q "InfRemote-${VERSION}-aarch64.dmg" page.html
+          grep -q "InfRemote-${VERSION}-x86_64.dmg" page.html
+          tus_upload page.html "acesso-remoto/infremote-page-${GITHUB_RUN_ID}.html" 'text/html'
+          echo 'Os três binários foram publicados. A página foi enviada com nome temporário; a troca final exige o mecanismo Hostinger de deploy configurado.'
