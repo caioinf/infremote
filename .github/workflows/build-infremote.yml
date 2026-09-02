@@ -6,12 +6,12 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Tag para o release (ex.: v1.4.9-infremote.1)"
+        description: "Tag para o release (ex.: v1.4.10-infremote.1)"
         required: false
-        default: "v1.4.9-infremote.1"
+        default: "v1.4.10-infremote.1"
 
 env:
-  VERSION: "1.4.9"
+  VERSION: "1.4.10"
   FLUTTER_VERSION: "3.24.5"
   RUST_VERSION_WINDOWS: "1.75"
   RUST_VERSION_MAC: "1.81"
@@ -159,6 +159,10 @@ jobs:
           tag_name: ${{ env.TAG_NAME }}
           files: ./SignOutput/InfRemote-*.exe
 
+      - name: Verify release asset
+        shell: bash
+        run: test -s ./SignOutput/InfRemote-${{ env.VERSION }}-win64.exe
+
   build-macos:
     name: macOS (${{ matrix.job.arch }})
     runs-on: ${{ matrix.job.os }}
@@ -264,6 +268,12 @@ jobs:
           fi
           ./build.py --flutter --hwcodec --unix-file-copy-paste ${{ matrix.job.extra-build-args }}
 
+      - name: Require Apple signing credentials
+        if: env.HAS_P12 == '' || env.HAS_APPLE_ID == ''
+        run: |
+          echo "Credenciais Apple ausentes: build macOS sem assinatura/notarização não é permitido." >&2
+          exit 1
+
       - name: codesign InfRemote.app
         if: env.HAS_P12 != ''
         env:
@@ -307,7 +317,7 @@ jobs:
           sed -i -e 's/MAXIMUM_UNMOUNTING_ATTEMPTS=3/MAXIMUM_UNMOUNTING_ATTEMPTS=7/' "$CREATE_DMG"
           create-dmg --icon "InfRemote.app" 200 190 --hide-extension "InfRemote.app" --window-size 800 400 --app-drop-link 600 185 InfRemote-${{ env.VERSION }}-${{ matrix.job.arch }}.dmg ./flutter/build/macos/Build/Products/Release/InfRemote.app
 
-      - name: notarize (skip se APPLE_ID nao setado)
+      - name: notarize InfRemote DMG
         if: env.HAS_APPLE_ID != ''
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
