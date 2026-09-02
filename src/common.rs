@@ -2092,7 +2092,17 @@ pub fn create_symmetric_key_msg(their_pk_b: [u8; 32]) -> (Bytes, Bytes, secretbo
 
 #[inline]
 pub fn using_public_server() -> bool {
-    crate::get_custom_rendezvous_server(get_option("custom-rendezvous-server")).is_empty()
+    // InfRemote: we ship with RENDEZVOUS_SERVERS embedded in config.rs, so the
+    // client is self-hosted even when the user has not set
+    // `custom-rendezvous-server`. Only treat as "public server" when both the
+    // user override AND the embedded server list are empty.
+    if !crate::get_custom_rendezvous_server(get_option("custom-rendezvous-server")).is_empty() {
+        return false;
+    }
+    if !hbb_common::config::RENDEZVOUS_SERVERS.is_empty() {
+        return false;
+    }
+    true
 }
 
 pub struct ThrottledInterval {
