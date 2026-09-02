@@ -293,7 +293,7 @@ jobs:
           # Assina o .app
           codesign --force --deep --sign "Developer ID Application" \
             --options runtime --timestamp \
-            --entitlements ./flutter/macos/Release.entitlements \
+            --entitlements ./flutter/macos/Runner/Release.entitlements \
             ./flutter/build/macos/Build/Products/Release/InfRemote.app
           codesign --verify --deep --strict --verbose=2 \
             ./flutter/build/macos/Build/Products/Release/InfRemote.app
